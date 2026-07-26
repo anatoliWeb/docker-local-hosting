@@ -24,7 +24,7 @@ if [ ! -f "$root_dir/.env" ]; then
     if [ -f "$root_dir/.env.example" ]; then
         cp "$root_dir/.env.example" "$root_dir/.env"
         echo "[OK] Створено .env iз .env.example."
-        echo "[УВАГА] Відредагуйте .env, особливо TRAEFIK_BASIC_AUTH."
+        echo "[УВАГА] Відредагуйте .env за потреби."
     else
         echo "[ПОМИЛКА] .env.example відсутній." >&2
         exit 1
@@ -37,10 +37,12 @@ fi
 
 echo ""
 echo "==> 3. Basic Auth"
-if [ -n "${TRAEFIK_BASIC_AUTH:-}" ]; then
-    echo "[OK] TRAEFIK_BASIC_AUTH налаштовано."
+users_file="$root_dir/secrets/traefik-users"
+if [ -f "$users_file" ] && [ -s "$users_file" ]; then
+    echo "[OK] Dashboard захищений Basic Auth: secrets/traefik-users."
 else
-    echo "[УВАГА] TRAEFIK_BASIC_AUTH порожній. Dashboard буде публічним."
+    echo "[УВАГА] secrets/traefik-users вiдсутнiй. Dashboard буде недоступний (401)."
+    echo "  Створiть: ./scripts/generate-dashboard-auth.sh"
 fi
 
 echo ""

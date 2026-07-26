@@ -12,5 +12,4 @@ http:
   middlewares:
     dashboard-auth:
       basicAuth:
-        users:
-          - "admin:$$2y$$10$$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36PQm4sEPhMNPfFhpYN76u"
+        usersFile: /run/secrets/traefik-users

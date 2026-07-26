@@ -34,7 +34,7 @@ if (-not (Test-Path $envFile)) {
     if (Test-Path $envExample) {
         Copy-Item $envExample $envFile
         Write-OK "Створено .env iз .env.example."
-        Write-Warn "Відредагуйте .env, особливо TRAEFIK_BASIC_AUTH."
+        Write-Warn "Відредагуйте .env за потреби."
     } else { Write-Err ".env.example відсутній." }
 } else {
     Write-OK ".env iснує."
@@ -46,10 +46,15 @@ Get-Content $envFile | ForEach-Object {
 
 # 3. Basic Auth
 Write-Step "3. Basic Auth"
-if ($env:TRAEFIK_BASIC_AUTH) {
-    Write-OK "TRAEFIK_BASIC_AUTH налаштовано."
+$usersFile = Join-Path $rootDir "secrets\traefik-users"
+if (Test-Path $usersFile) {
+    $usersSize = (Get-Item $usersFile).Length
+    if ($usersSize -gt 0) {
+        Write-OK "Dashboard захищений Basic Auth: secrets/traefik-users."
+    } else { Write-Warn "secrets/traefik-users порожній. Запустіть: .\scripts\generate-dashboard-auth.ps1" }
 } else {
-    Write-Warn "TRAEFIK_BASIC_AUTH порожній. Dashboard буде публічним. Для захисту налаштуйте .env."
+    Write-Warn "secrets/traefik-users відсутній. Dashboard буде недоступний (401)."
+    Write-Host "  Створіть: .\scripts\generate-dashboard-auth.ps1" -ForegroundColor Yellow
 }
 
 # 4. mkcert

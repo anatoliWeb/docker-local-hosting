@@ -53,7 +53,7 @@ if (Test-Path $envFile) {
     if (Test-Path $envExample) {
         Copy-Item $envExample $envFile
         Write-OK "Створено .env з .env.example."
-        Write-Warn "Відредагуйте .env, особливо TRAEFIK_BASIC_AUTH."
+        Write-Warn "Відредагуйте .env за потреби."
     } else { Write-Err ".env.example відсутній." }
 }
 
@@ -65,7 +65,7 @@ $certFile = $env:TLS_CERT_FILE; if (-not $certFile) { $certFile = "./certs/home.
 $certFile = $certFile.Replace("./", "$rootDir\")
 $keyFile = $env:TLS_KEY_FILE; if (-not $keyFile) { $keyFile = "./certs/home.arpa-key.pem" }
 $keyFile = $keyFile.Replace("./", "$rootDir\")
-$autoCerts = $env:AUTO_GENERATE_CERTS; if (-not $autoCerts) { $autoCerts = "true" }
+$autoCerts = $env:AUTO_GENERATE_CERTS; if (-not $autoCerts) { $autoCerts = "false" }
 $autoNetwork = $env:AUTO_CREATE_NETWORK; if (-not $autoNetwork) { $autoNetwork = "true" }
 
 # 6. Мережа (тепер створюється compose автоматично, але перевіряємо)
@@ -101,7 +101,16 @@ if ($certExists -and $keyExists) {
         Write-Warn "Сертифікати не знайдено. Запускаю генерацію..."
         & (Join-Path $PSScriptRoot "generate-certs.ps1")
     } else {
-        Write-Warn "Сертифікати не знайдено. Згенеруйте: .\scripts\generate-certs.ps1"
+        Write-Warn "Сертифікати не знайдено."
+        if (Get-Command "mkcert" -ErrorAction SilentlyContinue) {
+            $response = Read-Host "Згенерувати сертифікати? (Y/N)"
+            if ($response -eq "Y" -or $response -eq "y") {
+                & (Join-Path $PSScriptRoot "generate-certs.ps1")
+            }
+        } else {
+            Write-Host "  Встановіть mkcert: winget install FiloSottile.mkcert" -ForegroundColor Yellow
+            Write-Host "  Потім: .\scripts\generate-certs.ps1" -ForegroundColor Yellow
+        }
     }
 }
 

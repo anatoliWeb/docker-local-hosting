@@ -1,6 +1,7 @@
 #!/bin/sh
-# Зупиняє центральні сервіси docker-local-hosting.
-# Не видаляє спільну мережу local-hosting.
+# Зупиняє центральні сервіси без видалення мережі.
+# Використовує docker compose stop (не down).
+# Для повного видалення: ./scripts/destroy.sh
 
 set -Eeuo pipefail
 
@@ -10,19 +11,14 @@ echo "================================================"
 echo "  Docker Local Hosting — зупинка"
 echo "================================================"
 echo ""
-echo "Зупинка сервісів..."
+echo "Зупинка сервісів (docker compose stop)..."
 
 cd "$root_dir"
-docker compose down
+docker compose stop
 
-net_name="local-hosting"
-[ -f .env ] && . .env 2>/dev/null || true
-net_name="${LOCAL_HOSTING_NETWORK:-local-hosting}"
-
-if docker network ls --format "{{.Name}}" | grep -q "^${net_name}$"; then
-    echo "[OK] Мережа '$net_name' збережена."
-else
-    echo "[УВАГА] Мережа '$net_name' видалена."
-fi
-
+echo ""
 echo "[OK] Сервіси зупинено."
+echo "[OK] Мережа 'local-hosting' збережена."
+echo ""
+echo "Запуск: ./scripts/start.sh"
+echo "Повне видалення: ./scripts/destroy.sh"

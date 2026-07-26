@@ -48,6 +48,11 @@ docker-compose.override.yml
 logs/
 *.log
 
+# Секрети
+secrets/*
+!secrets/.gitkeep
+!secrets/README.md
+
 # Дозволені винятки
 !.env.example
 !certs/.gitkeep

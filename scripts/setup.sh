@@ -36,7 +36,7 @@ else
     if [ -f "$root_dir/.env.example" ]; then
         cp "$root_dir/.env.example" "$root_dir/.env"
         echo "[OK] Створено .env iз .env.example."
-        echo "[УВАГА] Вiдредагуйте .env, особливо TRAEFIK_BASIC_AUTH."
+        echo "[УВАГА] Вiдредагуйте .env за потреби."
     else
         echo "[ПОМИЛКА] .env.example вiдсутнiй." >&2
         exit 1

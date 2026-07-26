@@ -54,19 +54,23 @@ mkcert -install
 
 # 2. Налаштуйте .env
 Copy-Item .env.example .env
-# Відредагуйте TRAEFIK_BASIC_AUTH
 
-# 3. Згенеруйте сертифікати
+# 3. Створіть облікові дані для Dashboard
+.\scripts\generate-dashboard-auth.ps1
+
+# 4. Згенеруйте сертифікати
 .\scripts\generate-certs.ps1
 
-# 4. Додайте домени у hosts
+# 5. Додайте домени у hosts
 .\scripts\show-hosts-entry.ps1
 ```
 
 Або автоматично:
 ```powershell
 .\scripts\install-prerequisites.ps1
+.\scripts\generate-dashboard-auth.ps1
 .\scripts\setup.ps1
+.\scripts\start.ps1
 ```
 
 ## Щоденний запуск
@@ -215,8 +219,16 @@ Helper-скрипт може показати домен, але не публі
   -Url http://192.168.1.50:9000
 ```
 
-Створює `config/traefik/dynamic/services/camera.yaml`.
+Оновлює `config/traefik/dynamic/external-services.yaml` — єдиний registry-файл.
 Traefik підхоплює зміни без restart (watch: true).
+
+Для Windows host використовуйте `http://host.docker.internal:9000`.
+Не використовуйте `127.0.0.1` або `localhost` — всередині Traefik це контейнер.
+
+Керування:
+- `add-external-service.ps1/.sh` — додати або оновити
+- `remove-external-service.ps1/.sh` — видалити
+- `list-external-services.ps1/.sh` — список
 
 ## WebSocket
 
@@ -234,15 +246,20 @@ traefik.http.routers.ws-demo.rule=Host(`socket.home.arpa`)
 | Скрипт | Призначення |
 |--------|-------------|
 | `install-prerequisites.ps1/.sh` | Одноразова підготовка (mkcert, CA, Docker) |
+| `generate-dashboard-auth.ps1/.sh` | Створення secrets/traefik-users для Basic Auth |
+| `generate-certs.ps1/.sh` | Генерація TLS через mkcert |
 | `setup.ps1/.sh` | Перевірка та налаштування |
+| `preflight.ps1/.sh` | Повна перевірка готовності без змін |
 | `start.ps1/.sh` | Рекомендований запуск |
 | `stop.ps1/.sh` | Зупинка без видалення мережі |
+| `destroy.ps1/.sh` | Повне видалення (мережа, образи) з підтвердженням |
 | `status.ps1/.sh` | Статус сервісів |
 | `logs.ps1/.sh` | Перегляд логів |
 | `update.ps1/.sh` | Оновлення образів |
-| `generate-certs.ps1/.sh` | Генерація TLS |
 | `add-project.ps1/.sh` | Інтеграція проєкту через override |
-| `add-external-service.ps1/.sh` | Зовнішній сервіс (IP:port) |
+| `add-external-service.ps1/.sh` | Додати/оновити зовнішній сервіс |
+| `remove-external-service.ps1/.sh` | Видалити зовнішній сервіс |
+| `list-external-services.ps1/.sh` | Список зовнішніх сервісів |
 | `check-project.ps1/.sh` | Валідація compose.yaml |
 | `show-hosts-entry.ps1/.sh` | Підказка для hosts |
 
@@ -259,13 +276,13 @@ TCP/UDP вимагають:
 ## Команди
 
 ```powershell
-.\scripts\start.ps1       # запуск
-.\scripts\stop.ps1        # зупинка
-.\scripts\status.ps1      # статус
-.\scripts\logs.ps1        # логи
+.\scripts\start.ps1          # запуск
+.\scripts\stop.ps1           # зупинка (мережа зберігається)
+.\scripts\destroy.ps1        # повне видалення (мережа, образи)
+.\scripts\status.ps1         # статус
 .\scripts\logs.ps1 traefik   # логи Traefik
-.\scripts\update.ps1      # оновлення
-docker compose down       # повна зупинка (мережа зберігається)
+.\scripts\update.ps1         # оновлення
+.\scripts\preflight.ps1      # перевірка готовності
 ```
 
 ## Діагностика

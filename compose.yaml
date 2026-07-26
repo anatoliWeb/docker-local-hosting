@@ -36,6 +36,7 @@ services:
       - ./config/traefik/traefik.yaml:/etc/traefik/traefik.yaml:ro
       - ./config/traefik/dynamic:/etc/traefik/dynamic:ro
       - ./certs:/certs:ro
+      - ./secrets/traefik-users:/run/secrets/traefik-users:ro
     environment:
       - TZ=${TZ:-Europe/Kyiv}
     labels:
