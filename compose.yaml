@@ -1,0 +1,78 @@
+services:
+
+  traefik:
+    image: traefik:v3.7.9
+    container_name: traefik
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - local-hosting
+      - traefik-socket
+    volumes:
+      - ./config/traefik/traefik.yaml:/etc/traefik/traefik.yaml:ro
+      - ./config/traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./certs:/etc/traefik/certs:ro
+    environment:
+      - TZ=${TZ:-Europe/Kyiv}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`${TRAEFIK_DASHBOARD_HOST:-traefik.home.arpa}`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_BASIC_AUTH}"
+
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2
+    container_name: docker-socket-proxy
+    restart: unless-stopped
+    networks:
+      - traefik-socket
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+      - NETWORKS=1
+      - SERVICES=1
+      - TASKS=1
+      - POST=0
+      - LOG_LEVEL=info
+    labels:
+      - "traefik.enable=false"
+
+  demo:
+    image: nginx:stable-alpine
+    container_name: docker-local-hosting-demo
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - local-hosting
+    volumes:
+      - ./examples/nginx-demo/public:/usr/share/nginx/html:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.demo.rule=Host(`${DEMO_HOST:-demo.home.arpa}`)"
+      - "traefik.http.routers.demo.entrypoints=websecure"
+      - "traefik.http.routers.demo.tls=true"
+      - "traefik.http.services.demo.loadbalancer.server.port=80"
+
+networks:
+  local-hosting:
+    external: true
+    name: local-hosting
+  traefik-socket:
+    internal: true
+    name: traefik-socket

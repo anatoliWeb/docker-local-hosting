@@ -1,0 +1,54 @@
+# Секрети та конфіденційні дані
+.env
+
+# Сертифікати та ключі
+certs/*.pem
+certs/*.key
+certs/*-key.pem
+*.crt
+*.cer
+*.pfx
+*.p12
+
+# Системні файли Windows
+Thumbs.db
+Desktop.ini
+*.lnk
+
+# Системні файли macOS
+.DS_Store
+._*
+
+# Системні файли Linux
+.directory
+
+# IDE та редактори
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Тимчасові файли
+*.log
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Docker
+.docker/
+docker-compose.override.yaml
+docker-compose.override.yml
+
+# Логи
+logs/
+*.log
+
+# Дозволені винятки
+!.env.example
+!certs/.gitkeep
+!certs/README.md

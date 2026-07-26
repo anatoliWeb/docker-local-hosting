@@ -1,0 +1,21 @@
+# Приклад підключення окремого Docker-проєкту до локального хостингу
+# Скопіюйте цей файл у свій проєкт як compose.yaml
+# Змініть назви router, service та домен відповідно до вашого проєкту
+
+services:
+  app:
+    # Замініть на ваш образ
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    networks:
+      - local-hosting
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.myapp.rule=Host(`myapp.home.arpa`)"
+      - "traefik.http.routers.myapp.entrypoints=websecure"
+      - "traefik.http.routers.myapp.tls=true"
+      - "traefik.http.services.myapp.loadbalancer.server.port=80"
+
+networks:
+  local-hosting:
+    external: true

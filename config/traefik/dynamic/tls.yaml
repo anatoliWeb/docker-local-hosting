@@ -1,0 +1,5 @@
+# Динамічна конфігурація TLS
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/home.arpa.pem
+      keyFile: /etc/traefik/certs/home.arpa-key.pem
