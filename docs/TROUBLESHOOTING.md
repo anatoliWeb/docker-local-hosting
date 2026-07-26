@@ -11,6 +11,25 @@ bootstrap exited with code 1
 .\scripts\generate-certs.ps1
 ```
 
+Перед цим встановіть mkcert та локальний CA:
+
+```powershell
+winget install FiloSottile.mkcert
+mkcert -install
+```
+
+## .env відсутній
+
+Запускайте головну команду з кореня проєкту:
+
+```powershell
+.\start.ps1
+```
+
+Вона створить `.env` з `.env.example` лише за відсутності. Пряма команда
+`docker compose up -d` не створює `.env`, бо Compose читає його до старту
+контейнерів.
+
 ## Docker Desktop не запущений
 
 ```
@@ -36,15 +55,16 @@ netstat -ano | findstr :443
 
 ## Dashboard 401
 
-Неправильний Basic Auth. Перевірте `.env`:
-```bash
-echo $(htpasswd -nb admin password) | sed -e 's/\$/\$\$/g'
+Створіть новий файл `secrets/traefik-users`:
+
+```powershell
+.\scripts\generate-dashboard-auth.ps1
 ```
 
 ## Dashboard 404
 
-Bootstrap не створив dashboard.yaml або auth не налаштовано.
-Запустіть `.\scripts\setup.ps1` або `.\scripts\start.ps1`.
+Перевірте `config/traefik/dynamic/dashboard.yaml` і `secrets/traefik-users`.
+Запустіть `.\start.ps1`.
 
 ## Сертифікат не дійсний
 

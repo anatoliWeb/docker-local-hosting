@@ -1,19 +1,3 @@
 # External services registry
 # Auto-generated. Do not edit manually.
 # Use: .\scripts\add-external-service.ps1 .\scripts\remove-external-service.ps1
-
-http:
-  routers:
-    final:
-      rule: "Host(`final.home.arpa`)"
-      entrypoints:
-        - websecure
-      service: final
-      tls: true
-
-  services:
-    final:
-      loadBalancer:
-        servers:
-          - url: "http://host.docker.internal:5555"
-        passHostHeader: true

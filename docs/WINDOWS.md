@@ -12,31 +12,40 @@ mkcert -install
 .\scripts\install-prerequisites.ps1
 ```
 
-## Щоденний запуск
+## Запуск
+
+```powershell
+.\start.ps1
+```
+
+З `cmd.exe` використовуйте `start.cmd`.
+
+Під час першого запуску `start.ps1` копіює `.env.example` у `.env`.
+Наявний `.env` не змінюється. Docker Compose не може створити `.env` сам,
+бо читає змінні до запуску контейнерів.
+
+Після підготовки допустимий прямий запуск:
 
 ```powershell
 docker compose up -d
 ```
 
-Або рекомендований варіант:
-```powershell
-.\scripts\start.ps1
-```
-
 ## Що робить start.ps1
 
-1. Перевіряє Docker, .env.
-2. Перевіряє сертифікати, пропонує згенерувати.
-3. Валідує compose config.
-4. Запускає `docker compose up -d`.
-5. Очікує healthcheck.
-6. Показує URL.
+1. Створює `.env` лише за відсутності.
+2. Перевіряє Docker, daemon, Compose та preflight.
+3. Перевіряє Basic Auth і TLS, пропонує безпечну генерацію.
+4. Валідує `docker compose config`.
+5. Запускає `docker compose up -d` і очікує healthcheck.
+6. Показує URL і посилання на ручний чекліст.
 
 ## Скрипти
 
 | Команда | Опис |
 |---------|------|
-| `.\scripts\start.ps1` | Запуск |
+| `.\start.ps1` | Головний запуск Windows |
+| `start.cmd` | Обгортка для cmd.exe |
+| `.\scripts\start.ps1` | Сумісна обгортка |
 | `.\scripts\stop.ps1` | Зупинка |
 | `.\scripts\status.ps1` | Статус |
 | `.\scripts\logs.ps1 traefik` | Логи Traefik |

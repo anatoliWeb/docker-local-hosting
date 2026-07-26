@@ -42,7 +42,8 @@
 1. `docker compose up -d` створює мережу, запускає bootstrap, Traefik, proxy, demo.
 2. Traefik автоматично відстежує Docker events (watch: true).
 3. Новий контейнер з `traefik.enable=true` у мережі `local-hosting` отримує маршрут без restart.
-4. Зміни у `config/traefik/dynamic/` підхоплюються без restart.
+4. Скрипти зовнішніх сервісів копіюють registry у контейнер, щоб File Provider
+   оновив маршрути на Windows Docker Desktop без recreate Traefik.
 5. При зупинці контейнера маршрут автоматично зникає.
 
 ## Одноразова підготовка (Windows)
@@ -52,37 +53,32 @@
 winget install FiloSottile.mkcert
 mkcert -install
 
-# 2. Налаштуйте .env
-Copy-Item .env.example .env
-
-# 3. Створіть облікові дані для Dashboard
+# 2. Створіть облікові дані для Dashboard
 .\scripts\generate-dashboard-auth.ps1
 
-# 4. Згенеруйте сертифікати
+# 3. Згенеруйте сертифікати
 .\scripts\generate-certs.ps1
 
-# 5. Додайте домени у hosts
+# 4. Додайте домени у hosts
 .\scripts\show-hosts-entry.ps1
 ```
 
 Або автоматично:
 ```powershell
-.\scripts\install-prerequisites.ps1
 .\scripts\generate-dashboard-auth.ps1
-.\scripts\setup.ps1
-.\scripts\start.ps1
+.\scripts\generate-certs.ps1
+.\start.ps1
 ```
 
 ## Щоденний запуск
 
 ```powershell
-docker compose up -d
+.\start.ps1
 ```
 
-Або рекомендований варіант:
-```powershell
-.\scripts\start.ps1
-```
+`start.ps1` створює `.env` з `.env.example` лише при першому запуску.
+Наявний `.env` не перезаписується. Після підготовки `docker compose up -d`
+працює напряму, але не створює `.env`: це робить host entrypoint до запуску Compose.
 
 ### Linux
 
@@ -220,7 +216,8 @@ Helper-скрипт може показати домен, але не публі
 ```
 
 Оновлює `config/traefik/dynamic/external-services.yaml` — єдиний registry-файл.
-Traefik підхоплює зміни без restart (watch: true).
+На Windows Docker Desktop скрипт копіює registry у mounted dynamic directory,
+щоб File Provider отримав файлову подію без recreate контейнера.
 
 Для Windows host використовуйте `http://host.docker.internal:9000`.
 Не використовуйте `127.0.0.1` або `localhost` — всередині Traefik це контейнер.
@@ -250,7 +247,9 @@ traefik.http.routers.ws-demo.rule=Host(`socket.home.arpa`)
 | `generate-certs.ps1/.sh` | Генерація TLS через mkcert |
 | `setup.ps1/.sh` | Перевірка та налаштування |
 | `preflight.ps1/.sh` | Повна перевірка готовності без змін |
-| `start.ps1/.sh` | Рекомендований запуск |
+| `start.ps1`, `start.cmd` | Головний запуск Windows |
+| `scripts/ensure-env.ps1/.sh` | Створити `.env`, не перезаписуючи наявний |
+| `scripts/start.ps1/.sh` | Сумісний запуск |
 | `stop.ps1/.sh` | Зупинка без видалення мережі |
 | `destroy.ps1/.sh` | Повне видалення (мережа, образи) з підтвердженням |
 | `status.ps1/.sh` | Статус сервісів |
@@ -276,7 +275,7 @@ TCP/UDP вимагають:
 ## Команди
 
 ```powershell
-.\scripts\start.ps1          # запуск
+.\start.ps1                  # запуск
 .\scripts\stop.ps1           # зупинка (мережа зберігається)
 .\scripts\destroy.ps1        # повне видалення (мережа, образи)
 .\scripts\status.ps1         # статус

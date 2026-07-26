@@ -2,7 +2,7 @@
 .SYNOPSIS
     Видаляє зовнішній сервіс з Traefik File Provider.
 .DESCRIPTION
-    Видаляє сервіс з external-services.yaml. Traefik отримує SIGHUP.
+    Видаляє сервіс з external-services.yaml і оновлює File Provider у Traefik.
 .PARAMETER Name
     Ім'я сервісу для видалення.
 .PARAMETER Force
@@ -79,32 +79,34 @@ $sb = New-Object System.Text.StringBuilder
 $null = $sb.AppendLine("# External services registry")
 $null = $sb.AppendLine("# Auto-generated. Do not edit manually.")
 $null = $sb.AppendLine("# Use: .\scripts\add-external-service.ps1 .\scripts\remove-external-service.ps1")
-$null = $sb.AppendLine("")
-$null = $sb.AppendLine("http:")
-$null = $sb.AppendLine("  routers:")
+if ($services.Count -gt 0) {
+    $null = $sb.AppendLine("")
+    $null = $sb.AppendLine("http:")
+    $null = $sb.AppendLine("  routers:")
 
-$bt = [char]96
-$sorted = $services.Keys | Sort-Object
-foreach ($key in $sorted) {
-    $svcDomain = $services[$key].Domain
-    $null = $sb.AppendLine("    $key" + ":")
-    $null = $sb.AppendLine("      rule: ""Host($bt$svcDomain$bt)""")
-    $null = $sb.AppendLine("      entrypoints:")
-    $null = $sb.AppendLine("        - websecure")
-    $null = $sb.AppendLine("      service: " + $key)
-    $null = $sb.AppendLine("      tls: true")
-}
+    $bt = [char]96
+    $sorted = $services.Keys | Sort-Object
+    foreach ($key in $sorted) {
+        $svcDomain = $services[$key].Domain
+        $null = $sb.AppendLine("    $key" + ":")
+        $null = $sb.AppendLine("      rule: ""Host($bt$svcDomain$bt)""")
+        $null = $sb.AppendLine("      entrypoints:")
+        $null = $sb.AppendLine("        - websecure")
+        $null = $sb.AppendLine("      service: " + $key)
+        $null = $sb.AppendLine("      tls: true")
+    }
 
-$null = $sb.AppendLine("")
-$null = $sb.AppendLine("  services:")
+    $null = $sb.AppendLine("")
+    $null = $sb.AppendLine("  services:")
 
-foreach ($key in $sorted) {
-    $svcUrl = $services[$key].Url
-    $null = $sb.AppendLine("    $key" + ":")
-    $null = $sb.AppendLine("      loadBalancer:")
-    $null = $sb.AppendLine("        servers:")
-    $null = $sb.AppendLine("          - url: ""$svcUrl""")
-    $null = $sb.AppendLine("        passHostHeader: true")
+    foreach ($key in $sorted) {
+        $svcUrl = $services[$key].Url
+        $null = $sb.AppendLine("    $key" + ":")
+        $null = $sb.AppendLine("      loadBalancer:")
+        $null = $sb.AppendLine("        servers:")
+        $null = $sb.AppendLine("          - url: ""$svcUrl""")
+        $null = $sb.AppendLine("        passHostHeader: true")
+    }
 }
 
 $yamlContent = $sb.ToString().Replace("`r`n", "`n")
@@ -116,10 +118,10 @@ Move-Item -Path $tempPath -Destination $registryFile -Force
 
 Write-Host "[OK] Сервіс '$Name' видалено з $registryFile" -ForegroundColor Green
 Write-Host ""
-Write-Host "Перезавантаження конфігурації Traefik..." -ForegroundColor Cyan
-docker compose kill -s HUP traefik 2>$null
+Write-Host "Оновлення File Provider у Traefik..." -ForegroundColor Cyan
+docker exec traefik /bin/sh -c "cp /etc/traefik/dynamic/external-services.yaml /etc/traefik/dynamic/.external-services.yaml.tmp && mv /etc/traefik/dynamic/.external-services.yaml.tmp /etc/traefik/dynamic/external-services.yaml"
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "[OK] Traefik перезавантажено (SIGHUP). Без restart." -ForegroundColor Green
+    Write-Host "[OK] File Provider оновлено без recreate Traefik." -ForegroundColor Green
 } else {
-    Write-Host "[УВАГА] Не вдалося відправити SIGHUP." -ForegroundColor Yellow
+    Write-Host "[УВАГА] Не вдалося оновити File Provider. Запустіть stack і повторіть команду." -ForegroundColor Yellow
 }

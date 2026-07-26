@@ -24,10 +24,10 @@
 Set-Location E:\_programming_\_project_\docker-local-hosting
 ```
 
-- [ ] Створіть .env:
+- [ ] Перевірте автоматичне створення `.env`:
 
 ```powershell
-Copy-Item .env.example .env
+.\scripts\ensure-env.ps1
 ```
 
 - [ ] Перевірте, що .env ігнорується Git:
@@ -36,7 +36,8 @@ Copy-Item .env.example .env
 git check-ignore -v .env
 ```
 
-**Очікуваний результат:** `.env` (джерело: .gitignore)
+**Очікуваний результат:** Створено `.env` з `.env.example`. Повторний запуск
+показує `Файл .env уже існує` і не змінює його.
 
 ## C. Basic Auth
 
@@ -132,10 +133,10 @@ docker compose config
 
 **Очікуваний результат:** Вивід YAML без помилок.
 
-- [ ] Запустіть сервіси:
+- [ ] Якщо stack ще не запущено, виконайте:
 
 ```powershell
-docker compose up -d
+.\start.ps1
 ```
 
 **Очікуваний результат:** Контейнери запущено.
@@ -442,7 +443,7 @@ Get-Content config/traefik/dynamic/dashboard.yaml
 - [ ] Trusted HTTPS працює без `-k`
 - [ ] Dashboard: 401 без логіну, 200 з логіном
 - [ ] Docker hot discovery: новий контейнер = новий маршрут без restart
-- [ ] File Provider: оновлення external-services.yaml без restart
+- [ ] File Provider: оновлення external-services.yaml без recreate Traefik
 - [ ] Secrets (secrets/traefik-users) ігноруються Git
 - [ ] .env ігнорується Git
 - [ ] Немає `:latest` образів

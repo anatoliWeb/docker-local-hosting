@@ -8,7 +8,8 @@ services:
       - ${LOCAL_HOSTING_NETWORK:-local-hosting}
     volumes:
       - ./scripts/bootstrap.sh:/bootstrap.sh:ro
-      - ./certs:/certs:ro
+      - ${TLS_CERT_FILE:-./certs/home.arpa.pem}:/certs/home.arpa.pem:ro
+      - ${TLS_KEY_FILE:-./certs/home.arpa-key.pem}:/certs/home.arpa-key.pem:ro
     environment:
       - TLS_CERT_FILE=/certs/home.arpa.pem
       - TLS_KEY_FILE=/certs/home.arpa-key.pem
@@ -34,8 +35,9 @@ services:
       - traefik-socket
     volumes:
       - ./config/traefik/traefik.yaml:/etc/traefik/traefik.yaml:ro
-      - ./config/traefik/dynamic:/etc/traefik/dynamic:ro
-      - ./certs:/certs:ro
+      - ./config/traefik/dynamic:/etc/traefik/dynamic
+      - ${TLS_CERT_FILE:-./certs/home.arpa.pem}:/certs/home.arpa.pem:ro
+      - ${TLS_KEY_FILE:-./certs/home.arpa-key.pem}:/certs/home.arpa-key.pem:ro
       - ./secrets/traefik-users:/run/secrets/traefik-users:ro
     environment:
       - TZ=${TZ:-Europe/Kyiv}

@@ -3,7 +3,7 @@
     Додає зовнішній сервіс (не Docker) до Traefik через File Provider.
 .DESCRIPTION
     Оновлює config/traefik/dynamic/external-services.yaml (єдиний registry-файл).
-    Валідує URL, надсилає SIGHUP Traefik після запису.
+    Валідує URL і копіює registry у контейнер для File Provider reload на Windows.
 .PARAMETER Name
     Унікальне ім'я сервісу.
 .PARAMETER Domain
@@ -112,12 +112,12 @@ Move-Item -Path $tempPath -Destination $registryFile -Force
 Write-Host "[OK] Оновлено $registryFile" -ForegroundColor Green
 Write-Host "Сервіс $Name доступний за адресою https://$Domain" -ForegroundColor Green
 Write-Host ""
-Write-Host "Перезавантаження конфігурації Traefik..." -ForegroundColor Cyan
-docker compose kill -s HUP traefik 2>$null
+Write-Host "Оновлення File Provider у Traefik..." -ForegroundColor Cyan
+docker exec traefik /bin/sh -c "cp /etc/traefik/dynamic/external-services.yaml /etc/traefik/dynamic/.external-services.yaml.tmp && mv /etc/traefik/dynamic/.external-services.yaml.tmp /etc/traefik/dynamic/external-services.yaml"
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "[OK] Traefik перезавантажено (SIGHUP). Без restart." -ForegroundColor Green
+    Write-Host "[OK] File Provider оновлено без recreate Traefik." -ForegroundColor Green
 } else {
-    Write-Host "[УВАГА] Не вдалося відправити SIGHUP. Перезапустіть: docker compose restart traefik" -ForegroundColor Yellow
+    Write-Host "[УВАГА] Не вдалося оновити File Provider. Запустіть stack і повторіть команду." -ForegroundColor Yellow
 }
 Write-Host ""
 Write-Host "Додайте в hosts:" -ForegroundColor Yellow
