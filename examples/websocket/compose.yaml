@@ -1,0 +1,25 @@
+# WebSocket demo для docker-local-hosting.
+# Показує HTTP + WebSocket через Traefik без restart.
+# Запуск: docker compose -f compose.yaml up -d
+
+services:
+  ws-demo:
+    image: nginx:1.27-alpine
+    container_name: ws-demo
+    restart: unless-stopped
+    networks:
+      - ${LOCAL_HOSTING_NETWORK:-local-hosting}
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./public:/usr/share/nginx/html:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ws-demo.rule=Host(`${WS_HOST:-socket.home.arpa}`)"
+      - "traefik.http.routers.ws-demo.entrypoints=websecure"
+      - "traefik.http.routers.ws-demo.tls=true"
+      - "traefik.http.services.ws-demo.loadbalancer.server.port=80"
+
+networks:
+  local-hosting:
+    external: true
+    name: ${LOCAL_HOSTING_NETWORK:-local-hosting}

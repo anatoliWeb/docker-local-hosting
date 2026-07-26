@@ -1,16 +1,16 @@
 # Docker Local Hosting
 
-Локальний Docker-хостинг із Traefik, HTTPS, автоматичною публікацією контейнерів і підтримкою Windows та Linux.
+Локальний Docker-хостинг із Traefik, HTTPS, автоматичним виявленням сервісів.
 
 ## Призначення
 
-Запустіть центральний Traefik-проксі один раз, і всі ваші локальні Docker-проєкти будуть доступні через красиві домени з HTTPS:
+Запустіть центральний Traefik-проксі один раз — і всі ваші локальні Docker-проєкти
+доступні через HTTPS-домени без перезапуску Traefik:
 
 - `https://demo.home.arpa`
 - `https://traefik.home.arpa`
 - `https://myapp.home.arpa`
-
-Жодних ручних списків проєктів, жодних файлів конфігурації на кожен новий сайт. Просто підключіть контейнер до мережі `local-hosting` і додайте кілька labels.
+- `wss://socket.home.arpa`
 
 ## Архітектура
 
@@ -22,127 +22,148 @@
           Docker Socket Proxy  File Provider
                |                    |
           Docker socket        TLS config
-               |
-     Контейнери в мережі
-        local-hosting
+               |              External services
+     Docker контейнери        Dynamic reload
+     (watch: true)            (watch: true)
 ```
 
 ### Компоненти
 
 | Компонент | Версія | Призначення |
 |-----------|--------|-------------|
-| Traefik | v3.7.9 | Reverse proxy, автоматичне виявлення контейнерів |
-| Docker Socket Proxy | v0.4.2 | Безпечний прошарок між Traefik і Docker socket |
-| Nginx (demo) | stable-alpine | Демонстраційний сайт |
-| mkcert | latest | Локальний CA для HTTPS |
+| Traefik | v3.7.9 | Reverse proxy, auto-discovery |
+| Docker Socket Proxy | v0.4.2 | Безпечний прошарок до Docker socket |
+| Nginx (demo) | 1.27-alpine | Демонстраційний сайт |
+| Bootstrap | 3.20 | One-shot валідація TLS перед запуском |
+| mkcert | latest | Локальний CA (host, не container) |
 
-### Схема роботи
+### Як це працює
 
-1. Traefik отримує HTTP/HTTPS трафік на порти 80/443.
-2. Traefik читає Docker API через Docker Socket Proxy.
-3. Traefik знаходить контейнери з `traefik.enable=true` у мережі `local-hosting`.
-4. Traefik автоматично створює маршрути на основі labels контейнерів.
+1. `docker compose up -d` створює мережу, запускає bootstrap, Traefik, proxy, demo.
+2. Traefik автоматично відстежує Docker events (watch: true).
+3. Новий контейнер з `traefik.enable=true` у мережі `local-hosting` отримує маршрут без restart.
+4. Зміни у `config/traefik/dynamic/` підхоплюються без restart.
 5. При зупинці контейнера маршрут автоматично зникає.
 
-## Системні вимоги
-
-- **Windows**: Windows 10/11, Docker Desktop, PowerShell 5.1+
-- **Linux**: Docker Engine 24+, Docker Compose v2+, bash
-- **mkcert**: Для генерації локальних TLS-сертифікатів
-
-## Швидкий старт (Windows)
+## Одноразова підготовка (Windows)
 
 ```powershell
 # 1. Встановіть mkcert
-winget install mkcert
+winget install FiloSottile.mkcert
 mkcert -install
 
 # 2. Налаштуйте .env
 Copy-Item .env.example .env
-# Відредагуйте .env, особливо TRAEFIK_BASIC_AUTH
+# Відредагуйте TRAEFIK_BASIC_AUTH
 
-# 3. Запустіть налаштування (згенерує сертифікати, створить мережу)
+# 3. Згенеруйте сертифікати
+.\scripts\generate-certs.ps1
+
+# 4. Додайте домени у hosts
+.\scripts\show-hosts-entry.ps1
+```
+
+Або автоматично:
+```powershell
+.\scripts\install-prerequisites.ps1
 .\scripts\setup.ps1
+```
 
-# 4. Запустіть проєкт
+## Щоденний запуск
+
+```powershell
 docker compose up -d
 ```
 
-## Швидкий старт (Linux)
+Або рекомендований варіант:
+```powershell
+.\scripts\start.ps1
+```
+
+### Linux
 
 ```bash
-# 1. Встановіть mkcert
+# Одноразова підготовка
 sudo apt install libnss3-tools
 curl -JLO "https://dl.filippo.io/mkcert/latest?for=linux/amd64"
 chmod +x mkcert-*-linux-amd64
 sudo mv mkcert-*-linux-amd64 /usr/local/bin/mkcert
 mkcert -install
 
-# 2. Налаштуйте .env
 cp .env.example .env
-
-# 3. Запустіть налаштування
 chmod +x scripts/*.sh
+./scripts/generate-certs.sh
 ./scripts/setup.sh
 
-# 4. Запустіть проєкт
+# Щоденний запуск
 docker compose up -d
+# або
+./scripts/start.sh
 ```
 
-## Налаштування .env
+## Bootstrap TLS
 
-Скопіюйте `.env.example` у `.env` та відредагуйте:
+Перед запуском Traefik, compose запускає `bootstrap` сервіс, який:
+- перевіряє наявність TLS сертифіката;
+- перевіряє, що файли не порожні;
+- показує українську помилку при відсутності;
+- завершується з кодом 0 лише при готовності.
 
-```dotenv
-LOCAL_DOMAIN=home.arpa
-TRAEFIK_DASHBOARD_HOST=traefik.home.arpa
-DEMO_HOST=demo.home.arpa
-TRAEFIK_BASIC_AUTH=
-TZ=Europe/Kyiv
-COMPOSE_PROJECT_NAME=docker-local-hosting
-LOCAL_HOSTING_NETWORK=local-hosting
-TLS_CERT_FILE=./certs/home.arpa.pem
-TLS_KEY_FILE=./certs/home.arpa-key.pem
-MKCERT_DOMAINS=home.arpa *.home.arpa
-AUTO_GENERATE_CERTS=true
-AUTO_CREATE_NETWORK=true
+Traefik залежить від bootstrap:
+```yaml
+depends_on:
+  bootstrap:
+    condition: service_completed_successfully
 ```
 
-### Нові змінні Stage 2
+## Автоматичне створення мережі
 
-| Змінна | Призначення |
-|--------|-------------|
-| `LOCAL_HOSTING_NETWORK` | Назва зовнішньої Docker-мережі |
-| `TLS_CERT_FILE` | Шлях до файлу сертифіката |
-| `TLS_KEY_FILE` | Шлях до файлу ключа |
-| `MKCERT_DOMAINS` | Домени для генерації сертифіката |
-| `AUTO_GENERATE_CERTS` | Авто-генерація сертифікатів (true/false) |
-| `AUTO_CREATE_NETWORK` | Авто-створення мережі (true/false) |
+Мережа `local-hosting` створюється автоматично при `docker compose up -d`
+(без `external: true` у центральному compose).
 
-## Скрипти
+Сторонні проєкти використовують:
+```yaml
+networks:
+  local-hosting:
+    external: true
+    name: ${LOCAL_HOSTING_NETWORK:-local-hosting}
+```
 
-| Скрипт | Призначення |
-|--------|-------------|
-| `scripts/setup.ps1` / `.sh` | Повна перевірка та налаштування |
-| `scripts/generate-certs.ps1` / `.sh` | Генерація TLS-сертифікатів |
-| `scripts/create-network.ps1` / `.sh` | Створення Docker-мережі |
-| `scripts/check-project.ps1` / `.sh` | Перевірка сумісності проєкту |
-| `scripts/show-hosts-entry.ps1` / `.sh` | Підказка для hosts-файлу |
+`docker compose down` не видаляє мережу, якщо до неї підключені інші контейнери.
 
 ## Додавання нового проєкту
 
-Використовуйте шаблон:
+### Спосіб 1: Generator (override, безпечно)
+
+```powershell
+.\scripts\add-project.ps1 `
+  -ProjectPath "E:\Projects\myapp" `
+  -Domain "myapp.home.arpa" `
+  -Service "web" `
+  -InternalPort 8080
+```
+
+Створює `compose.traefik.override.yaml` поруч із `compose.yaml`.
+Оригінальний compose не змінюється.
+
+```powershell
+docker compose -f compose.yaml -f compose.traefik.override.yaml --env-file .env.traefik up -d
+```
+
+### Спосіб 2: Шаблон
 
 ```bash
 cp -r examples/project-template projects/myapp
+docker compose -f projects/myapp/compose.yaml up -d
 ```
 
-Або додайте до свого `compose.yaml`:
+### Спосіб 3: Вручну
 
+Додайте до compose.yaml:
 ```yaml
 services:
   app:
-    image: nginx:stable-alpine
+    image: nginx:1.27-alpine
     networks:
       - ${LOCAL_HOSTING_NETWORK:-local-hosting}
     labels:
@@ -158,88 +179,138 @@ networks:
     name: ${LOCAL_HOSTING_NETWORK:-local-hosting}
 ```
 
-Докладніше: [docs/ADDING-A-PROJECT.md](docs/ADDING-A-PROJECT.md), [examples/project-template/](examples/project-template/).
+## Порт
 
-## Перевірка проєкту
+### Режим A: автоматичний
+
+Якщо image має рівно один EXPOSE, Traefik може використати його.
+Не задавайте `server.port` в цьому випадку.
+
+### Режим B: явний (рекомендований)
+
+Завжди задавайте порт явно:
+```yaml
+traefik.http.services.myapp.loadbalancer.server.port: "${APP_INTERNAL_PORT:-8080}"
+```
+
+Check-project покаже:
+- `АВТОВИЗНАЧЕННЯ БЕЗПЕЧНЕ` — один expose;
+- `ПОТРIБНО ВКАЗАТИ APP_INTERNAL_PORT` — кілька або жодного.
+
+## Домен
+
+Домен має задаватися явно в `.env`:
+```dotenv
+APP_DOMAIN=myapp.home.arpa
+```
+
+Helper-скрипт може показати домен, але не публікує контейнер без згоди.
+
+## Зовнішні сервіси за IP і портом
 
 ```powershell
-.\scripts\check-project.ps1 .\projects\myapp
+.\scripts\add-external-service.ps1 `
+  -Name camera `
+  -Domain camera.home.arpa `
+  -Url http://192.168.1.50:9000
 ```
 
-## Записи hosts
+Створює `config/traefik/dynamic/services/camera.yaml`.
+Traefik підхоплює зміни без restart (watch: true).
+
+## WebSocket
+
+Протокол WebSocket не потребує додаткових middleware в Traefik.
+HTTP Upgrade передається автоматично.
+
+```yaml
+traefik.http.routers.ws-demo.rule=Host(`socket.home.arpa`)
+```
+
+Приклад: [examples/websocket/](examples/websocket/)
+
+## Скрипти
+
+| Скрипт | Призначення |
+|--------|-------------|
+| `install-prerequisites.ps1/.sh` | Одноразова підготовка (mkcert, CA, Docker) |
+| `setup.ps1/.sh` | Перевірка та налаштування |
+| `start.ps1/.sh` | Рекомендований запуск |
+| `stop.ps1/.sh` | Зупинка без видалення мережі |
+| `status.ps1/.sh` | Статус сервісів |
+| `logs.ps1/.sh` | Перегляд логів |
+| `update.ps1/.sh` | Оновлення образів |
+| `generate-certs.ps1/.sh` | Генерація TLS |
+| `add-project.ps1/.sh` | Інтеграція проєкту через override |
+| `add-external-service.ps1/.sh` | Зовнішній сервіс (IP:port) |
+| `check-project.ps1/.sh` | Валідація compose.yaml |
+| `show-hosts-entry.ps1/.sh` | Підказка для hosts |
+
+## TCP/UDP
+
+HTTP/HTTPS/WebSocket маршрути додаються без restart.
+TCP/UDP вимагають:
+- додати entrypoint у static config;
+- опублікувати host port у Compose;
+- recreate/restart Traefik.
+
+Профілі: [profiles/tcp/](profiles/tcp/), [profiles/udp/](profiles/udp/)
+
+## Команди
 
 ```powershell
-.\scripts\show-hosts-entry.ps1
+.\scripts\start.ps1       # запуск
+.\scripts\stop.ps1        # зупинка
+.\scripts\status.ps1      # статус
+.\scripts\logs.ps1        # логи
+.\scripts\logs.ps1 traefik   # логи Traefik
+.\scripts\update.ps1      # оновлення
+docker compose down       # повна зупинка (мережа зберігається)
 ```
-
-Додайте в файл hosts (від адміністратора):
-
-```
-127.0.0.1 traefik.home.arpa
-127.0.0.1 demo.home.arpa
-127.0.0.1 myapp.home.arpa
-```
-
-**Windows**: `C:\Windows\System32\drivers\etc\hosts`
-**Linux**: `/etc/hosts`
-
-## Документація
-
-- [ADDING-A-PROJECT.md](docs/ADDING-A-PROJECT.md) — додавання нового проєкту
-- [HTTPS.md](docs/HTTPS.md) — сертифікати та HTTPS
-- [WINDOWS.md](docs/WINDOWS.md) — налаштування Windows
-- [LINUX.md](docs/LINUX.md) — налаштування Linux
-- [LAN.md](docs/LAN.md) — доступ із локальної мережі
-- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — діагностика
 
 ## Діагностика
 
 ```powershell
-docker compose ps
-docker compose logs --tail=100
-curl -I https://demo.home.arpa
-curl -I https://traefik.home.arpa
+curl.exe -sk -H "Host: demo.home.arpa" https://localhost/
+curl.exe -sk -H "Host: traefik.home.arpa" https://localhost/
+docker compose logs --tail=50
 ```
-
-## Безпека
-
-- Traefik не має прямого доступу до Docker socket — використовується Docker Socket Proxy.
-- Docker Socket Proxy має read-only доступ.
-- Dashboard захищений Basic Auth.
-- `exposedByDefault: false` — лише явно позначені контейнери публікуються.
-- `.env` та сертифікати виключені з Git.
 
 ## Відомі обмеження
 
 - Файл hosts не підтримує wildcard — кожен домен окремо.
-- Вкладені піддомени (`api.crm.home.arpa`) не покриваються wildcard `*.home.arpa`.
-- Рекомендується використовувати однорівневі домени.
-- DNS-сервер не входить у Stage 1 — див. [docs/LOCAL-DNS.md](docs/LOCAL-DNS.md).
-- Не призначено для production-середовища.
+- Вкладені піддомени не покриваються wildcard `*.home.arpa`.
+- TCP/UDP потребують restart Traefik для нового entrypoint.
+- mkcert не встановлює CA в контейнер — CA на хості.
+- Не призначено для production.
+
+## Документація
+
+- [ADDING-A-PROJECT.md](docs/ADDING-A-PROJECT.md)
+- [HTTPS.md](docs/HTTPS.md)
+- [WINDOWS.md](docs/WINDOWS.md)
+- [LINUX.md](docs/LINUX.md)
+- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+- [SIP.md](docs/SIP.md)
+- [FILE-TRANSFER.md](docs/FILE-TRANSFER.md)
+- [LAN.md](docs/LAN.md)
+- [LOCAL-DNS.md](docs/LOCAL-DNS.md)
 
 ## Roadmap
 
-- [x] Traefik v3 з Docker provider
-- [x] Docker Socket Proxy
+- [x] Traefik v3 з Docker provider + File provider
+- [x] Docker Socket Proxy (безпечний)
 - [x] HTTPS через mkcert
 - [x] Basic Auth для Dashboard
-- [x] Автоматичне виявлення контейнерів
-- [x] Демонстраційний сайт
-- [x] Приклади підключення
-- [x] Stage 2: покращення сертифікатів, .env, шаблони
-- [ ] Власна адмін-панель для перегляду сервісів
-- [ ] Підтримка вкладених піддоменів через SAN
-- [ ] Інтеграція з локальним DNS (AdGuard Home, Pi-hole)
-- [ ] Автоматичне оновлення сертифікатів
-
-## Ліцензія
-
-MIT License.
-
-## Використаний upstream
-
-- [BretFisher/compose-dev-tls](https://github.com/BretFisher/compose-dev-tls) (Unlicense)
-- [tecnativa/docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) (Apache 2.0)
-- [traefik/traefik](https://github.com/traefik/traefik) (MIT)
-
-Докладніше: [docs/UPSTREAM-REPOSITORY.md](docs/UPSTREAM-REPOSITORY.md).
+- [x] Автоматичне виявлення контейнерів (watch: true)
+- [x] Bootstrap TLS перевірка
+- [x] Auto-network через compose
+- [x] Dynamic File Provider hot-reload
+- [x] External IP:port сервіси
+- [x] WebSocket/WSS
+- [x] Override generator (безпечна інтеграція)
+- [x] Lifecycle скрипти
+- [x] TCP/UDP профілі
+- [ ] Власна адмін-панель
+- [ ] Локальний DNS (AdGuard, Pi-hole)
+- [ ] Повна SIP/RTP підтримка

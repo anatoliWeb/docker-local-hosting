@@ -1,0 +1,31 @@
+# SIP signaling через Traefik UDP/TCP (обмежений приклад)
+# ВИМАГАЄ: додати entrypoint sip-udp та sip-tcp у static config
+# Та перезапустити Traefik.
+#
+# УВАГА: Це лише signaling. RTP media потребує окремого діапазону портів.
+# Для повної SIP-телефонії потрібен окремий етап налаштування.
+# Див. docs/SIP.md.
+
+services:
+  asterisk:
+    image: andrius/asterisk:18-alpine
+    restart: unless-stopped
+    networks:
+      - local-hosting
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+    labels:
+      - "traefik.enable=true"
+      # SIP UDP
+      - "traefik.udp.routers.sip.entrypoints=sip-udp"
+      - "traefik.udp.services.sip.loadbalancer.server.port=5060"
+      # SIP TCP
+      - "traefik.tcp.routers.sip-tcp.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.sip-tcp.entrypoints=sip-tcp"
+      - "traefik.tcp.services.sip-tcp.loadbalancer.server.port=5060"
+
+networks:
+  local-hosting:
+    external: true
+    name: ${LOCAL_HOSTING_NETWORK:-local-hosting}

@@ -1,0 +1,21 @@
+# Raw TCP сервіс через Traefik
+# ВИМАГАЄ: додати entrypoint custom-tcp у config/traefik/traefik.yaml
+# Та перезапустити Traefik.
+
+services:
+  tcp-app:
+    image: alpine:3.20
+    restart: unless-stopped
+    networks:
+      - local-hosting
+    command: ["nc", "-lk", "-p", "9999", "-e", "/bin/cat"]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.tcp-app.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.tcp-app.entrypoints=custom-tcp"
+      - "traefik.tcp.services.tcp-app.loadbalancer.server.port=9999"
+
+networks:
+  local-hosting:
+    external: true
+    name: ${LOCAL_HOSTING_NETWORK:-local-hosting}

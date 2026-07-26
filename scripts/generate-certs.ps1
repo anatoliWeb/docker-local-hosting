@@ -1,11 +1,10 @@
-<#
+﻿<#
 .SYNOPSIS
     Генерує TLS-сертифікати для локальних доменів через mkcert.
 .DESCRIPTION
     Читає TLS_CERT_FILE, TLS_KEY_FILE, MKCERT_DOMAINS із .env.
     Якщо сертифікати вже існують і дійсні — пропускає.
     Створює бекап старих сертифікатів.
-    Для Windows Server використовує --install.
 .EXAMPLE
     .\scripts\generate-certs.ps1
 #>
@@ -13,10 +12,9 @@
 $ErrorActionPreference = "Stop"
 $rootDir = Resolve-Path -Path "$PSScriptRoot\.."
 
-# Завантаження змінних із .env
 $envFile = Join-Path $rootDir ".env"
 if (-not (Test-Path $envFile)) {
-    Write-Host "[ПОМИЛКА] .env не знайдено. Скопіюйте .env.example у .env." -ForegroundColor Red
+    Write-Host "[ПОМИЛКА] .env не знайдено." -ForegroundColor Red
     exit 1
 }
 Get-Content $envFile | ForEach-Object {
@@ -30,17 +28,15 @@ $domains = $env:MKCERT_DOMAINS; if (-not $domains) { $domains = "home.arpa *.hom
 $certFile = [System.IO.Path]::GetFullPath((Join-Path $rootDir $certRel.Replace("./", "")))
 $keyFile  = [System.IO.Path]::GetFullPath((Join-Path $rootDir $keyRel.Replace("./", "")))
 $certsDir = [System.IO.Path]::GetDirectoryName($certFile)
-
 if (-not (Test-Path $certsDir)) { New-Item -ItemType Directory -Path $certsDir -Force | Out-Null }
 
-# Перевірка mkcert
 $mkcert = Get-Command "mkcert" -ErrorAction SilentlyContinue
 if (-not $mkcert) {
-    Write-Host "[ПОМИЛКА] mkcert не знайдено. Встановіть: https://github.com/FiloSottile/mkcert" -ForegroundColor Red
+    Write-Host "[ПОМИЛКА] mkcert не знайдено." -ForegroundColor Red
+    Write-Host "  Встановіть: winget install FiloSottile.mkcert" -ForegroundColor Yellow
     exit 1
 }
 
-# Перевірка, чи існують валідні сертифікати
 $certExists = Test-Path $certFile
 $keyExists  = Test-Path $keyFile
 $skip = $false
@@ -54,45 +50,39 @@ if ($certExists -and $keyExists) {
             $notAfter = $cert.NotAfter
             $daysLeft = ($notAfter - (Get-Date)).Days
             if ($daysLeft -gt 30) {
-                Write-Host "[OK] Сертифікати дійсні ще $daysLeft днів, пропускаю генерацію." -ForegroundColor Green
+                Write-Host "[OK] Сертифікати дійсні, пропускаю." -ForegroundColor Green
                 $skip = $true
             } elseif ($daysLeft -gt 0) {
-                Write-Host "[УВАГА] Сертифікати скоро прострочаться ($daysLeft днів)." -ForegroundColor Yellow
+                Write-Host "[УВАГА] Скоро прострочаться ($daysLeft дн.)." -ForegroundColor Yellow
             } else {
-                Write-Host "[УВАГА] Сертифікати прострочено." -ForegroundColor Yellow
+                Write-Host "[УВАГА] Прострочено." -ForegroundColor Yellow
             }
             $cert.Dispose()
         } catch {
-            Write-Host "[УВАГА] Не вдалося перевірити сертифікат, генерую заново." -ForegroundColor Yellow
+            Write-Host "[УВАГА] Не вдалося перевірити, генерую заново." -ForegroundColor Yellow
         }
     }
 }
 
 if (-not $skip) {
-    # Бекап старих сертифікатів
     if ($certExists -or $keyExists) {
         $backupDir = Join-Path $certsDir "backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
         New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
         if ($certExists) { Move-Item $certFile -Destination $backupDir -Force }
         if ($keyExists)  { Move-Item $keyFile -Destination $backupDir -Force }
-        Write-Host "[INFO] Старі сертифікати переміщено до $backupDir" -ForegroundColor Cyan
+        Write-Host "[INFO] Старi файли перемiщено до $backupDir" -ForegroundColor Cyan
     }
 
-    # Генерація
     $domainArgs = $domains -split "\s+"
-    $installFlag = @()
-    $isNano = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name "EditionID" 2>$null).EditionID -match "Server"
-    if ($isNano) { $installFlag = @("--install") }
-
-    Write-Host "Генерую сертифікати для: $domains" -ForegroundColor Cyan
-    & $mkcert.Path -cert-file $certFile -key-file $keyFile @installFlag @domainArgs
+    Write-Host "Генерую сертифiкати для: $domains" -ForegroundColor Cyan
+    & $mkcert.Path -cert-file $certFile -key-file $keyFile @domainArgs
 
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "[OK] Сертифікати створено:" -ForegroundColor Green
-        Write-Host "  Сертифікат: $certFile" -ForegroundColor Green
+        Write-Host "[OK] Сертифiкати створено:" -ForegroundColor Green
+        Write-Host "  Сертифiкат: $certFile" -ForegroundColor Green
         Write-Host "  Ключ:       $keyFile" -ForegroundColor Green
     } else {
-        Write-Host "[ПОМИЛКА] Генерація сертифікатів не вдалася." -ForegroundColor Red
+        Write-Host "[ПОМИЛКА] Генерацiя не вдалася." -ForegroundColor Red
         exit 1
     }
 }

@@ -1,23 +1,38 @@
 # Приклади підключення
 
-Цей каталог містить приклади налаштування Docker-проєктів для роботи з `docker-local-hosting`.
-
 ## Вміст
 
-- `nginx-demo/` — демонстраційний сайт, який запускається разом із центральним проєктом.
-- `project-template/` — шаблон для швидкого створення нового проєкту з HTTPS.
-- `basic-container.compose.example.yaml` — шаблон підключення звичайного контейнера.
-- `laravel.compose.example.yaml` — шаблон підключення Laravel-проєкту.
+- `nginx-demo/` — демонстраційний сайт.
+- `project-template/` — шаблон нового проєкту.
+- `integration-override/` — Traefik override (безпечне підключення).
+- `websocket/` — WebSocket/WSS приклад.
+- `basic-container.compose.example.yaml` — звичайний контейнер.
+- `laravel.compose.example.yaml` — Laravel проєкт.
 
 ## Як використовувати
 
-Для нового проєкту скопіюйте `project-template/`:
-
+### Новий проєкт
 ```bash
 cp -r examples/project-template projects/myapp
 ```
 
-Для одноразового підключення використовуйте `*.compose.example.yaml`:
+### Підключення через override (безпечно)
 ```bash
-cp examples/basic-container.compose.example.yaml my-project/compose.yaml
+# Скопіюйте override шаблон
+cp examples/integration-override/compose.traefik.override.yaml my-project/
+cp examples/integration-override/.env.traefik.example my-project/.env.traefik
+
+# Запустіть
+docker compose -f compose.yaml -f compose.traefik.override.yaml --env-file .env.traefik up -d
+```
+
+### WebSocket demo
+```bash
+docker compose -f examples/websocket/compose.yaml up -d
+```
+
+### Автоматичний generator
+```powershell
+.\scripts\add-project.ps1 -ProjectPath ".\my-project" -Domain "myapp.home.arpa" -Service "web"
+.\scripts\add-external-service.ps1 -Name camera -Domain camera.home.arpa -Url http://192.168.1.50:9000
 ```

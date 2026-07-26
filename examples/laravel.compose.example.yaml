@@ -1,26 +1,23 @@
 # Приклад налаштування Laravel-проєкту для локального хостингу
-# Скопіюйте цей файл у свій Laravel-проєкт як compose.yaml
-# Налаштуйте змінні середовища у .env вашого Laravel-проєкту
+# Змініть назви router, service та домен.
 
 services:
   nginx:
-    image: nginx:stable-alpine
+    image: nginx:1.27-alpine
     restart: unless-stopped
     networks:
-      - local-hosting
+      - ${LOCAL_HOSTING_NETWORK:-local-hosting}
       - laravel
     volumes:
       - ./:/var/www/html:ro
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     labels:
-      # Основний домен
       - "traefik.enable=true"
-      - "traefik.http.routers.myproject.rule=Host(`myproject.home.arpa`)"
+      - "traefik.http.routers.myproject.rule=Host(`${APP_DOMAIN:-myproject.home.arpa}`)"
       - "traefik.http.routers.myproject.entrypoints=websecure"
       - "traefik.http.routers.myproject.tls=true"
       - "traefik.http.services.myproject.loadbalancer.server.port=80"
-      # API піддомен (або використовуйте myproject-api.home.arpa для спрощення TLS)
-      - "traefik.http.routers.myproject-api.rule=Host(`api.myproject.home.arpa`)"
+      - "traefik.http.routers.myproject-api.rule=Host(`api.${APP_DOMAIN:-myproject.home.arpa}`)"
       - "traefik.http.routers.myproject-api.entrypoints=websecure"
       - "traefik.http.routers.myproject-api.tls=true"
       - "traefik.http.services.myproject-api.loadbalancer.server.port=80"
@@ -33,10 +30,11 @@ services:
     volumes:
       - ./:/var/www/html:ro
     environment:
-      - APP_URL=https://myproject.home.arpa
+      - APP_URL=https://${APP_DOMAIN:-myproject.home.arpa}
 
 networks:
   local-hosting:
     external: true
+    name: ${LOCAL_HOSTING_NETWORK:-local-hosting}
   laravel:
     internal: true

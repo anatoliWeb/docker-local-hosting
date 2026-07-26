@@ -1,0 +1,24 @@
+# MQTT через Traefik TCP
+# ВИМАГАЄ: додати entrypoint tcp-mqtt у config/traefik/traefik.yaml
+# Та перезапустити Traefik.
+
+services:
+  mqtt:
+    image: eclipse-mosquitto:2.0.18
+    restart: unless-stopped
+    networks:
+      - local-hosting
+    expose:
+      - "1883"
+      - "8883"
+    labels:
+      - "traefik.enable=true"
+      # MQTT без TLS
+      - "traefik.tcp.routers.mqtt.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.mqtt.entrypoints=tcp-mqtt"
+      - "traefik.tcp.services.mqtt.loadbalancer.server.port=1883"
+
+networks:
+  local-hosting:
+    external: true
+    name: ${LOCAL_HOSTING_NETWORK:-local-hosting}

@@ -1,0 +1,25 @@
+# SFTP через Traefik TCP
+# ВИМАГАЄ: додати entrypoint sftp у config/traefik/traefik.yaml
+# Та перезапустити Traefik.
+# Для локальної платформи рекомендовано SFTP замість FTP.
+
+services:
+  sftp:
+    image: atmoz/sftp:debian-9
+    restart: unless-stopped
+    networks:
+      - local-hosting
+    volumes:
+      - ./sftp-data:/home/user/upload
+    environment:
+      - SFTP_USERS=user:password:::upload
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.sftp.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.sftp.entrypoints=sftp"
+      - "traefik.tcp.services.sftp.loadbalancer.server.port=22"
+
+networks:
+  local-hosting:
+    external: true
+    name: ${LOCAL_HOSTING_NETWORK:-local-hosting}

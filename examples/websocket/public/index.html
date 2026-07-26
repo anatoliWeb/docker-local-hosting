@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>WebSocket Demo</title>
+<style>
+body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; line-height: 1.6; }
+h1 { font-size: 24px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; }
+.status { color: #2e7d32; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>WebSocket Demo</h1>
+<p class="status" id="status">З'єднання...</p>
+<pre id="log"></pre>
+
+<script>
+const log = document.getElementById('log');
+const status = document.getElementById('status');
+const ws = new WebSocket('wss://socket.home.arpa/ws');
+
+ws.onopen = () => {
+  status.textContent = 'WebSocket підключено';
+  ws.send('Привіт, WebSocket!');
+};
+
+ws.onmessage = (e) => {
+  log.textContent += 'Отримано: ' + e.data + '\n';
+  status.textContent = 'Повідомлення отримано';
+};
+
+ws.onerror = () => {
+  status.textContent = 'Помилка з\'єднання';
+};
+</script>
+</body>
+</html>

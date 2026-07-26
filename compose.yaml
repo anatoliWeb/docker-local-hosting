@@ -1,9 +1,26 @@
 services:
 
+  bootstrap:
+    image: alpine:3.20
+    container_name: docker-local-hosting-bootstrap
+    restart: "no"
+    networks:
+      - ${LOCAL_HOSTING_NETWORK:-local-hosting}
+    volumes:
+      - ./scripts/bootstrap.sh:/bootstrap.sh:ro
+      - ./certs:/certs:ro
+    environment:
+      - TLS_CERT_FILE=/certs/home.arpa.pem
+      - TLS_KEY_FILE=/certs/home.arpa-key.pem
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+
   traefik:
     image: traefik:v3.7.9
     container_name: traefik
     restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 30s
@@ -23,12 +40,6 @@ services:
       - TZ=${TZ:-Europe/Kyiv}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`${TRAEFIK_DASHBOARD_HOST:-traefik.home.arpa}`)"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
-      - "traefik.http.routers.dashboard.tls=true"
-      - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
-      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_BASIC_AUTH}"
 
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:v0.4.2
@@ -49,9 +60,12 @@ services:
       - "traefik.enable=false"
 
   demo:
-    image: nginx:stable-alpine
+    image: nginx:1.27-alpine
     container_name: docker-local-hosting-demo
     restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
@@ -70,8 +84,9 @@ services:
 
 networks:
   local-hosting:
-    external: true
     name: ${LOCAL_HOSTING_NETWORK:-local-hosting}
+    driver: bridge
+    attachable: true
   traefik-socket:
     internal: true
     name: traefik-socket

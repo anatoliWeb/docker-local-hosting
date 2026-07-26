@@ -1,0 +1,22 @@
+# Traefik integration override for external project
+# Скопіюйте поруч із compose.yaml вашого проєкту.
+# Змініть ім'я сервісу, домен та порт.
+# Запуск:
+#   docker compose -f compose.yaml -f compose.traefik.override.yaml up -d
+
+services:
+  web:
+    networks:
+      - local-hosting
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "${LOCAL_HOSTING_NETWORK:-local-hosting}"
+      traefik.http.routers.myproject.rule: "Host(`${APP_DOMAIN}`)"
+      traefik.http.routers.myproject.entrypoints: "websecure"
+      traefik.http.routers.myproject.tls: "true"
+      traefik.http.services.myproject.loadbalancer.server.port: "${APP_INTERNAL_PORT:-8080}"
+
+networks:
+  local-hosting:
+    external: true
+    name: "${LOCAL_HOSTING_NETWORK:-local-hosting}"

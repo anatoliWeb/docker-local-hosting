@@ -1,0 +1,20 @@
+# Custom UDP сервіс через Traefik
+# ВИМАГАЄ: додати entrypoint custom-udp у config/traefik/traefik.yaml
+# Та перезапустити Traefik.
+
+services:
+  udp-app:
+    image: alpine:3.20
+    restart: unless-stopped
+    networks:
+      - local-hosting
+    command: ["nc", "-lku", "-p", "5000"]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.udp.routers.udp-app.entrypoints=custom-udp"
+      - "traefik.udp.services.udp-app.loadbalancer.server.port=5000"
+
+networks:
+  local-hosting:
+    external: true
+    name: ${LOCAL_HOSTING_NETWORK:-local-hosting}
