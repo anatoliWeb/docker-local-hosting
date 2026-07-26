@@ -13,12 +13,12 @@ services:
       - "80:80"
       - "443:443"
     networks:
-      - local-hosting
+      - ${LOCAL_HOSTING_NETWORK:-local-hosting}
       - traefik-socket
     volumes:
       - ./config/traefik/traefik.yaml:/etc/traefik/traefik.yaml:ro
       - ./config/traefik/dynamic:/etc/traefik/dynamic:ro
-      - ./certs:/etc/traefik/certs:ro
+      - ./certs:/certs:ro
     environment:
       - TZ=${TZ:-Europe/Kyiv}
     labels:
@@ -29,7 +29,6 @@ services:
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_BASIC_AUTH}"
-
 
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:v0.4.2
@@ -59,7 +58,7 @@ services:
       timeout: 5s
       retries: 3
     networks:
-      - local-hosting
+      - ${LOCAL_HOSTING_NETWORK:-local-hosting}
     volumes:
       - ./examples/nginx-demo/public:/usr/share/nginx/html:ro
     labels:
@@ -72,7 +71,7 @@ services:
 networks:
   local-hosting:
     external: true
-    name: local-hosting
+    name: ${LOCAL_HOSTING_NETWORK:-local-hosting}
   traefik-socket:
     internal: true
     name: traefik-socket

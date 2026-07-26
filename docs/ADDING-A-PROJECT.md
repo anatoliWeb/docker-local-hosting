@@ -4,22 +4,37 @@
 
 Центральний Traefik автоматично знаходить нові контейнери через Docker Socket Proxy. Єдина вимога — ваш контейнер має бути підключений до зовнішньої мережі `local-hosting` та мати відповідні Traefik labels.
 
-## Крок 1: Додайте мережу до вашого compose.yaml
+## Спосіб 1: Шаблон проєкту (рекомендовано)
+
+```bash
+cp -r examples/project-template projects/myapp
+```
+
+Змініть `MYAPP_HOST` у `projects/myapp/.env` та запустіть:
+
+```bash
+docker compose -f projects/myapp/compose.yaml up -d
+```
+
+## Спосіб 2: Вручну
+
+### Крок 1: Додайте мережу до вашого compose.yaml
 
 ```yaml
 networks:
   local-hosting:
     external: true
+    name: ${LOCAL_HOSTING_NETWORK:-local-hosting}
 ```
 
-## Крок 2: Додайте Traefik labels до вашого сервісу
+### Крок 2: Додайте Traefik labels до вашого сервісу
 
 ```yaml
 services:
   app:
     image: nginx:stable-alpine
     networks:
-      - local-hosting
+      - ${LOCAL_HOSTING_NETWORK:-local-hosting}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.myapp.rule=Host(`myapp.home.arpa`)"
@@ -28,44 +43,34 @@ services:
       - "traefik.http.services.myapp.loadbalancer.server.port=80"
 ```
 
-### Як називати router
+### Крок 3: Додайте домен у hosts
 
-- Унікальне ім'я в межах усього Traefik.
-- Використовуйте назву проєкту: `myapp`, `crm`, `blog`.
-
-### Як називати service
-
-- Так само унікальне ім'я.
-- Зазвичай збігається з назвою router: `myapp`.
-
-### internal port
-
-Вкажіть порт, на якому ваш контейнер слухає всередині. Не плутайте з `ports:`.
-
-### Чому `ports` не потрібні
-
-Traefik працює через внутрішню Docker-мережу. Якщо контейнер має labels та підключений до `local-hosting`, Traefik сам знайде його і направить трафік. `ports:` потрібні лише якщо потрібен прямий доступ до контейнера без Traefik.
-
-## Крок 3: Додайте домен у hosts
-
-Відредагуйте файл hosts з правами адміністратора:
-```
-192.168.1.100 myapp.home.arpa
+```powershell
+.\scripts\show-hosts-entry.ps1 myapp.home.arpa
 ```
 
-## Крок 4: Запустіть проєкт
+Або вручну в файл hosts (від адміністратора):
+```
+127.0.0.1 myapp.home.arpa
+```
+
+### Крок 4: Запустіть проєкт
 
 ```bash
 docker compose up -d
 ```
 
-## Крок 5: Перевірте
+### Крок 5: Перевірте
 
 ```bash
 curl -I https://myapp.home.arpa
 ```
 
-Відкрийте в браузері `https://myapp.home.arpa`.
+### Крок 6: Валідація проєкту
+
+```bash
+.\scripts\check-project.ps1 .\projects\myapp
+```
 
 ## Зупинка та видалення маршруту
 
@@ -87,4 +92,4 @@ docker compose down
 
 ## Повний приклад
 
-Див. [examples/basic-container.compose.example.yaml](../examples/basic-container.compose.example.yaml).
+Див. [examples/project-template/](../examples/project-template/).

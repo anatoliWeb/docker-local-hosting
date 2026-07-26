@@ -8,67 +8,71 @@
 - bash
 
 ## Встановлення Docker Engine
+
 ```bash
-# Для Ubuntu/Debian:
+# Ubuntu/Debian:
 sudo apt update
 sudo apt install docker.io docker-compose-v2
 sudo systemctl enable --now docker
 ```
 
-Для інших дистрибутивів див. [docs.docker.com](https://docs.docker.com/engine/install/).
-
 ## Встановлення mkcert
+
 ```bash
-# Ubuntu/Debian:
 sudo apt install libnss3-tools
 curl -JLO "https://dl.filippo.io/mkcert/latest?for=linux/amd64"
 chmod +x mkcert-*-linux-amd64
 sudo mv mkcert-*-linux-amd64 /usr/local/bin/mkcert
-```
-
-або через пакетний менеджер (якщо доступно):
-```bash
-# Arch:
-sudo pacman -S mkcert
-```
-
-## Створення локального CA
-```bash
 mkcert -install
 ```
 
-## Генерація сертифіката
+## Повне налаштування
+
 ```bash
-./scripts/generate-certs.sh
+# 1. Налаштуйте .env
+cp .env.example .env
+
+# 2. Запустіть скрипт налаштування
+chmod +x scripts/*.sh
+./scripts/setup.sh
+
+# 3. Запустіть проєкт
+docker compose up -d
 ```
 
+Скрипт `setup.sh` автоматично:
+- Перевіряє Docker, .env, мережу, сертифікати
+- Створює мережу (якщо `AUTO_CREATE_NETWORK=true`)
+- Генерує сертифікати (якщо `AUTO_GENERATE_CERTS=true`)
+
 ## /etc/hosts
-Відредагуйте `/etc/hosts` з правами root:
+
 ```bash
 sudo nano /etc/hosts
 ```
 
 Додайте записи:
+
 ```
-192.168.1.100 demo.home.arpa
-192.168.1.100 traefik.home.arpa
+127.0.0.1 demo.home.arpa
+127.0.0.1 traefik.home.arpa
+```
+
+Для підказки:
+
+```bash
+./scripts/show-hosts-entry.sh
 ```
 
 ## Firewall
+
 ```bash
-# Якщо використовуєте ufw:
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 ```
 
-## Запуск
-```bash
-chmod +x scripts/*.sh
-./scripts/setup.sh
-docker compose up -d
-```
+## Перевірка
 
-## Перевірка через curl
 ```bash
 curl -I https://demo.home.arpa
 curl -I https://traefik.home.arpa

@@ -1,0 +1,26 @@
+# Docker Local Hosting — шаблон проєкту
+# Скопіюйте цю директорію для нового проєкту з HTTPS через Traefik.
+#
+# Швидкий старт:
+#   1. Встановіть змінні в .env та ../.env
+#   2. Додайте домен у файл hosts
+#   3. docker compose -f compose.yaml up -d
+
+services:
+  app:
+    image: nginx:stable-alpine
+    container_name: myapp
+    restart: unless-stopped
+    networks:
+      - ${LOCAL_HOSTING_NETWORK:-local-hosting}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.myapp.rule=Host(`${MYAPP_HOST:-myapp.home.arpa}`)"
+      - "traefik.http.routers.myapp.entrypoints=websecure"
+      - "traefik.http.routers.myapp.tls=true"
+      - "traefik.http.services.myapp.loadbalancer.server.port=80"
+
+networks:
+  local-hosting:
+    external: true
+    name: ${LOCAL_HOSTING_NETWORK:-local-hosting}

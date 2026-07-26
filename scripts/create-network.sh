@@ -1,32 +1,24 @@
 #!/bin/sh
-# Створює зовнішню Docker-мережу local-hosting, якщо вона ще не існує.
-# Idempotent — безпечно запускати багаторазово.
+# Створює зовнішню Docker-мережу для docker-local-hosting.
+# Читає LOCAL_HOSTING_NETWORK із .env.
 
 set -Eeuo pipefail
 
-# Перевірка Docker
-if ! command -v docker >/dev/null 2>&1; then
-    echo "ПОМИЛКА: Docker не знайдено. Встановіть Docker Engine."
+root_dir="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ ! -f "$root_dir/.env" ]; then
+    echo "[ПОМИЛКА] .env не знайдено. Скопіюйте .env.example у .env."
     exit 1
 fi
-echo "Docker знайдено: $(docker --version)"
 
-# Перевірка Docker daemon
-if ! docker info >/dev/null 2>&1; then
-    echo "ПОМИЛКА: Docker daemon недоступний. Запустіть Docker."
-    exit 1
-fi
-echo "Docker daemon працює."
+. "$root_dir/.env"
+network_name="${LOCAL_HOSTING_NETWORK:-local-hosting}"
 
-# Перевірка існування мережі
-if docker network ls --format "{{.Name}}" | grep -q "^local-hosting$"; then
-    echo "Мережа local-hosting вже існує. Нічого не змінено."
+if docker network ls --format "{{.Name}}" | grep -q "^${network_name}$"; then
+    echo "[OK] Мережа '$network_name' вже існує."
     exit 0
 fi
 
-# Створення мережі
-echo "Створюю зовнішню Docker-мережу local-hosting..."
-docker network create local-hosting --driver bridge --attachable
-
-echo "Мережа local-hosting успішно створена."
-echo "Тепер ви можете запустити основний проєкт: docker compose up -d"
+echo "Створюю мережу '$network_name'..."
+docker network create "$network_name" --driver bridge --attachable
+echo "[OK] Мережу '$network_name' створено."

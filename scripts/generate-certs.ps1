@@ -1,71 +1,98 @@
 <#
 .SYNOPSIS
-    Генерує локальний TLS-сертифікат для home.arpa через mkcert.
+    Генерує TLS-сертифікати для локальних доменів через mkcert.
 .DESCRIPTION
-    Скрипт перевіряє наявність mkcert, локального CA,
-    створює каталог certs та генерує сертифікат із необхідними доменами.
+    Читає TLS_CERT_FILE, TLS_KEY_FILE, MKCERT_DOMAINS із .env.
+    Якщо сертифікати вже існують і дійсні — пропускає.
+    Створює бекап старих сертифікатів.
+    Для Windows Server використовує --install.
 .EXAMPLE
     .\scripts\generate-certs.ps1
 #>
 
 $ErrorActionPreference = "Stop"
-$certsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\certs" | Resolve-Path -ErrorAction SilentlyContinue
-if (-not $certsDir) {
-    $certsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\certs"
-    New-Item -ItemType Directory -Path $certsDir -Force | Out-Null
-    $certsDir = Resolve-Path -Path $certsDir
+$rootDir = Resolve-Path -Path "$PSScriptRoot\.."
+
+# Завантаження змінних із .env
+$envFile = Join-Path $rootDir ".env"
+if (-not (Test-Path $envFile)) {
+    Write-Host "[ПОМИЛКА] .env не знайдено. Скопіюйте .env.example у .env." -ForegroundColor Red
+    exit 1
 }
+Get-Content $envFile | ForEach-Object {
+    if ($_ -match '^([^#=]+)=(.+)$') { Set-Item -Path "env:$($matches[1])" -Value $matches[2] 2>$null }
+}
+
+$certRel = $env:TLS_CERT_FILE; if (-not $certRel) { $certRel = "./certs/home.arpa.pem" }
+$keyRel  = $env:TLS_KEY_FILE;  if (-not $keyRel)  { $keyRel = "./certs/home.arpa-key.pem" }
+$domains = $env:MKCERT_DOMAINS; if (-not $domains) { $domains = "home.arpa *.home.arpa" }
+
+$certFile = [System.IO.Path]::GetFullPath((Join-Path $rootDir $certRel.Replace("./", "")))
+$keyFile  = [System.IO.Path]::GetFullPath((Join-Path $rootDir $keyRel.Replace("./", "")))
+$certsDir = [System.IO.Path]::GetDirectoryName($certFile)
+
+if (-not (Test-Path $certsDir)) { New-Item -ItemType Directory -Path $certsDir -Force | Out-Null }
 
 # Перевірка mkcert
-$mkcertPath = Get-Command mkcert -ErrorAction SilentlyContinue
-if (-not $mkcertPath) {
-    Write-Host "ПОМИЛКА: mkcert не знайдено." -ForegroundColor Red
-    Write-Host "" -ForegroundColor Red
-    Write-Host "Встановіть mkcert:" -ForegroundColor Yellow
-    Write-Host "  1. Завантажте з https://github.com/FiloSottile/mkcert/releases" -ForegroundColor Yellow
-    Write-Host "  2. Або через winget: winget install mkcert" -ForegroundColor Yellow
-    Write-Host "  3. Або через chocolatey: choco install mkcert" -ForegroundColor Yellow
-    Write-Host "" -ForegroundColor Yellow
-    Write-Host "Після встановлення запустіть: mkcert -install" -ForegroundColor Yellow
-    exit 1
-}
-Write-Host "mkcert знайдено: $($mkcertPath.Source)" -ForegroundColor Green
-
-# Перевірка локального CA
-$caCheck = mkcert -install 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "ПОМИЛКА: Не вдалося встановити локальний CA через mkcert." -ForegroundColor Red
-    Write-Host "Спробуйте запустити вручну: mkcert -install" -ForegroundColor Yellow
+$mkcert = Get-Command "mkcert" -ErrorAction SilentlyContinue
+if (-not $mkcert) {
+    Write-Host "[ПОМИЛКА] mkcert не знайдено. Встановіть: https://github.com/FiloSottile/mkcert" -ForegroundColor Red
     exit 1
 }
 
-# Отримання шляху до CA
-$caPath = mkcert -CAROOT 2>&1
-Write-Host "Локальний CA знаходиться за шляхом: $caPath" -ForegroundColor Cyan
+# Перевірка, чи існують валідні сертифікати
+$certExists = Test-Path $certFile
+$keyExists  = Test-Path $keyFile
+$skip = $false
 
-# Генерація сертифіката
-$certFile = Join-Path -Path $certsDir -ChildPath "home.arpa.pem"
-$keyFile = Join-Path -Path $certsDir -ChildPath "home.arpa-key.pem"
-
-Write-Host "Генерую сертифікат для доменів: home.arpa, *.home.arpa" -ForegroundColor Cyan
-Write-Host "Увага: wildcard *.home.arpa не покриває вкладені піддомени (наприклад, api.crm.home.arpa)." -ForegroundColor Yellow
-Write-Host "Для вкладених піддоменів додайте їх вручну до команди mkcert або використовуйте однорівневі домени." -ForegroundColor Yellow
-
-mkcert -cert-file $certFile -key-file $keyFile "home.arpa" "*.home.arpa"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "ПОМИЛКА: Не вдалося згенерувати сертифікат." -ForegroundColor Red
-    exit 1
+if ($certExists -and $keyExists) {
+    $certSize = (Get-Item $certFile).Length
+    $keySize  = (Get-Item $keyFile).Length
+    if ($certSize -gt 0 -and $keySize -gt 0) {
+        try {
+            $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 $certFile
+            $notAfter = $cert.NotAfter
+            $daysLeft = ($notAfter - (Get-Date)).Days
+            if ($daysLeft -gt 30) {
+                Write-Host "[OK] Сертифікати дійсні ще $daysLeft днів, пропускаю генерацію." -ForegroundColor Green
+                $skip = $true
+            } elseif ($daysLeft -gt 0) {
+                Write-Host "[УВАГА] Сертифікати скоро прострочаться ($daysLeft днів)." -ForegroundColor Yellow
+            } else {
+                Write-Host "[УВАГА] Сертифікати прострочено." -ForegroundColor Yellow
+            }
+            $cert.Dispose()
+        } catch {
+            Write-Host "[УВАГА] Не вдалося перевірити сертифікат, генерую заново." -ForegroundColor Yellow
+        }
+    }
 }
 
-Write-Host "" -ForegroundColor Cyan
-Write-Host "Сертифікати згенеровано успішно:" -ForegroundColor Green
-Write-Host "  Сертифікат: $certFile" -ForegroundColor Green
-Write-Host "  Приватний ключ: $keyFile" -ForegroundColor Green
-Write-Host "" -ForegroundColor Cyan
-Write-Host "ВАЖЛИВО: Приватний ключ не комітьте в Git." -ForegroundColor Yellow
-Write-Host "ВАЖЛИВО: Не копіюйте CA private key на інші комп'ютери." -ForegroundColor Yellow
-Write-Host "" -ForegroundColor Cyan
-Write-Host "Наступні кроки:" -ForegroundColor Cyan
-Write-Host "  1. Додайте записи у файл hosts (адміністратор)" -ForegroundColor Cyan
-Write-Host "  2. Запустіть: docker compose up -d" -ForegroundColor Cyan
-exit 0
+if (-not $skip) {
+    # Бекап старих сертифікатів
+    if ($certExists -or $keyExists) {
+        $backupDir = Join-Path $certsDir "backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+        if ($certExists) { Move-Item $certFile -Destination $backupDir -Force }
+        if ($keyExists)  { Move-Item $keyFile -Destination $backupDir -Force }
+        Write-Host "[INFO] Старі сертифікати переміщено до $backupDir" -ForegroundColor Cyan
+    }
+
+    # Генерація
+    $domainArgs = $domains -split "\s+"
+    $installFlag = @()
+    $isNano = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name "EditionID" 2>$null).EditionID -match "Server"
+    if ($isNano) { $installFlag = @("--install") }
+
+    Write-Host "Генерую сертифікати для: $domains" -ForegroundColor Cyan
+    & $mkcert.Path -cert-file $certFile -key-file $keyFile @installFlag @domainArgs
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "[OK] Сертифікати створено:" -ForegroundColor Green
+        Write-Host "  Сертифікат: $certFile" -ForegroundColor Green
+        Write-Host "  Ключ:       $keyFile" -ForegroundColor Green
+    } else {
+        Write-Host "[ПОМИЛКА] Генерація сертифікатів не вдалася." -ForegroundColor Red
+        exit 1
+    }
+}
